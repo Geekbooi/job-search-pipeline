@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write              # needed to commit seen_jobs.json back
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   search:
     runs-on: ubuntu-latest
