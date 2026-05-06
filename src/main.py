@@ -4,6 +4,9 @@ Entry point — orchestrates the full pipeline:
 """
 
 import sys
+from dotenv import load_dotenv
+load_dotenv()
+
 from fetcher import fetch_all
 from filter  import filter_jobs
 from dedup   import filter_new

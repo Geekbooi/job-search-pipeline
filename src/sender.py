@@ -11,7 +11,7 @@ from email.mime.text      import MIMEText
 SMTP_HOST = os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", "587"))
 EMAIL_USER = os.environ["EMAIL_USER"]
-EMAIL_PASS = os.environ["EMAIL_PASSWORD"]
+EMAIL_PASS = os.environ["EMAIL_PASSWORD"].replace(" ", "")  # Gmail app passwords may include spaces
 EMAIL_TO   = os.environ["EMAIL_TO"]
 
 
