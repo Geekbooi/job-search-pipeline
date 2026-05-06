@@ -1,6 +1,6 @@
 # Job Search Pipeline
 
-Automated job search assistant that runs every 12 hours, finds relevant mid-level engineering roles with H1B/visa sponsorship, and delivers curated results to Telegram.
+Automated job search assistant that runs every 12 hours, finds relevant mid-level engineering roles with H1B/visa sponsorship, and delivers curated results to your inbox as a styled HTML email.
 
 ## What it does
 
@@ -8,7 +8,7 @@ Automated job search assistant that runs every 12 hours, finds relevant mid-leve
 2. **Pre-filters** by role keywords, excludes senior/lead/intern titles, excludes postings that explicitly reject sponsorship or require clearance
 3. **Claude filtering** — batches shortlisted jobs through Claude (claude-sonnet-4-6) to score each on role match, experience level (3–5 years), employment type, and sponsorship signals
 4. **Deduplicates** against previously seen job IDs to avoid repeat notifications
-5. **Sends** up to 10 new results to your Telegram chat with sponsorship notes, key requirements, and apply link
+5. **Emails** up to 10 new results as a clean HTML digest with sponsorship notes, key requirements, and apply links
 
 ## Target roles
 
@@ -28,24 +28,24 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Create a Telegram bot
+### 2. Gmail app password
 
-1. Message [@BotFather](https://t.me/BotFather) → `/newbot`
-2. Copy the bot token
-3. Start a chat with your bot, then run:
-   ```bash
-   curl "https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates"
-   ```
-   Find your `chat.id` in the response.
+If using Gmail you must use an **App Password** (not your account password):
 
-### 3. Configure secrets
+1. Enable 2-step verification on your Google account
+2. Go to **Google Account → Security → App Passwords**
+3. Create a new app password (name it "Job Pipeline")
+4. Use that 16-character password as `EMAIL_PASSWORD`
+
+### 3. Configure environment
 
 Copy `.env.example` to `.env` and fill in:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
-TELEGRAM_BOT_TOKEN=123456789:ABC...
-TELEGRAM_CHAT_ID=your_chat_id
+EMAIL_USER=you@gmail.com
+EMAIL_PASSWORD=your_16char_app_password
+EMAIL_TO=you@gmail.com
 RAPIDAPI_KEY=optional_for_jsearch
 ```
 
@@ -58,18 +58,21 @@ python main.py
 
 ### 5. GitHub Actions (automated every 12h)
 
-Add these repository secrets under **Settings → Secrets → Actions**:
+Add these repository secrets under **Settings → Secrets and variables → Actions**:
 
-| Secret | Required |
-|--------|----------|
-| `ANTHROPIC_API_KEY` | Yes |
-| `TELEGRAM_BOT_TOKEN` | Yes |
-| `TELEGRAM_CHAT_ID` | Yes |
-| `RAPIDAPI_KEY` | No (enables JSearch) |
+| Secret | Required | Notes |
+|--------|----------|-------|
+| `ANTHROPIC_API_KEY` | Yes | |
+| `EMAIL_USER` | Yes | Gmail address used to send |
+| `EMAIL_PASSWORD` | Yes | Gmail app password |
+| `EMAIL_TO` | Yes | Recipient address (can be same as EMAIL_USER) |
+| `EMAIL_SMTP_HOST` | No | Defaults to `smtp.gmail.com` |
+| `EMAIL_SMTP_PORT` | No | Defaults to `587` |
+| `RAPIDAPI_KEY` | No | Enables JSearch as a 4th source |
 
-The workflow at `.github/workflows/job_search.yml` runs at 00:00 and 12:00 UTC daily. It also commits the updated `data/seen_jobs.json` back to the repo after each run so deduplication persists across runs.
+The workflow runs at 00:00 and 12:00 UTC daily and commits the updated `data/seen_jobs.json` back after each run so deduplication persists across runs.
 
-You can also trigger a manual run from **Actions → Job Search Pipeline → Run workflow**.
+Trigger a manual run anytime from **Actions → Job Search Pipeline → Run workflow**.
 
 ## Project structure
 
@@ -80,8 +83,8 @@ job-search-pipeline/
 │   ├── fetcher.py     # multi-source job fetching + pre-filter
 │   ├── filter.py      # Claude batch filtering
 │   ├── dedup.py       # seen_jobs.json deduplication
-│   ├── formatter.py   # Telegram message formatting
-│   └── sender.py      # Telegram Bot API sender
+│   ├── formatter.py   # HTML email builder
+│   └── sender.py      # SMTP email sender
 ├── data/
 │   └── seen_jobs.json # persisted seen job IDs (auto-committed)
 ├── .github/

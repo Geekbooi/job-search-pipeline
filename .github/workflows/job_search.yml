@@ -28,9 +28,12 @@ jobs:
       - name: Run pipeline
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          RAPIDAPI_KEY:       ${{ secrets.RAPIDAPI_KEY }}
+          EMAIL_USER:        ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD:    ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO:          ${{ secrets.EMAIL_TO }}
+          EMAIL_SMTP_HOST:   ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT:   ${{ secrets.EMAIL_SMTP_PORT }}
+          RAPIDAPI_KEY:      ${{ secrets.RAPIDAPI_KEY }}
         run: python src/main.py
 
       - name: Commit updated seen_jobs.json
