@@ -6,9 +6,10 @@ Sources: RemoteOK, Jobicy, We Work Remotely, JSearch (RapidAPI — optional).
 import os
 import re
 import time
+import email.utils
 import requests
 import feedparser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 REQUEST_TIMEOUT = 15
 
@@ -38,6 +39,37 @@ TECH_KEYWORDS = [
     "devops", "cloud", "backend", "distributed", "microservices", "iac",
     "infrastructure as code",
 ]
+
+
+MAX_AGE_DAYS = 3
+
+
+def _parse_posted(value: str) -> datetime | None:
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        return email.utils.parsedate_to_datetime(value)
+    except Exception:
+        pass
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        pass
+    try:
+        dt = datetime.strptime(value[:10], "%Y-%m-%d")
+        return dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        pass
+    return None
+
+
+def _is_recent(posted: str) -> bool:
+    dt = _parse_posted(posted)
+    if dt is None:
+        return True  # no date — keep it, can't tell
+    cutoff = datetime.now(timezone.utc) - timedelta(days=MAX_AGE_DAYS)
+    return dt >= cutoff
 
 
 def _strip_html(text: str) -> str:
@@ -273,5 +305,6 @@ def fetch_all() -> list[dict]:
             seen_urls.add(job["url"])
             unique.append(job)
 
-    print(f"[fetcher] Total unique candidates: {len(unique)}")
-    return unique
+    recent = [j for j in unique if _is_recent(j.get("posted", ""))]
+    print(f"[fetcher] {len(recent)} within {MAX_AGE_DAYS} days out of {len(unique)} unique candidates")
+    return recent
