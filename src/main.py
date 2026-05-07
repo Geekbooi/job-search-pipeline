@@ -12,7 +12,7 @@ from filter  import filter_jobs
 from dedup   import filter_new
 from sender  import send_jobs, send_notice
 
-MAX_RESULTS = 10
+MAX_RESULTS = 20
 
 
 def main() -> None:
