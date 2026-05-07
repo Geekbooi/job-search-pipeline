@@ -6,10 +6,9 @@ Sources: RemoteOK, Jobicy, We Work Remotely, JSearch (RapidAPI — optional).
 import os
 import re
 import time
-import email.utils
 import requests
 import feedparser
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 REQUEST_TIMEOUT = 15
 
@@ -39,42 +38,6 @@ TECH_KEYWORDS = [
     "devops", "cloud", "backend", "distributed", "microservices", "iac",
     "infrastructure as code",
 ]
-
-
-RECENCY_HOURS = 72   # 3 days — dedup handles re-sends, this just blocks months-old listings
-
-
-def _parse_posted(value: str) -> datetime | None:
-    """Parse a posted date string into an aware datetime. Returns None if unparseable."""
-    if not value:
-        return None
-    value = value.strip()
-    # Try RFC 2822 (RSS feeds)
-    try:
-        return email.utils.parsedate_to_datetime(value)
-    except Exception:
-        pass
-    # Try ISO 8601 (Z suffix or offset)
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except Exception:
-        pass
-    # Try plain date "YYYY-MM-DD"
-    try:
-        dt = datetime.strptime(value[:10], "%Y-%m-%d")
-        return dt.replace(tzinfo=timezone.utc)
-    except Exception:
-        pass
-    return None
-
-
-def _is_recent(posted: str) -> bool:
-    """Return True if posted within RECENCY_HOURS, or if date is unknown (include by default)."""
-    dt = _parse_posted(posted)
-    if dt is None:
-        return True   # unknown date — don't exclude
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=RECENCY_HOURS)
-    return dt >= cutoff
 
 
 def _strip_html(text: str) -> str:
@@ -310,7 +273,5 @@ def fetch_all() -> list[dict]:
             seen_urls.add(job["url"])
             unique.append(job)
 
-    # Filter to recent postings only
-    recent = [j for j in unique if _is_recent(j.get("posted", ""))]
-    print(f"[fetcher] {len(recent)} recent (last {RECENCY_HOURS}h) out of {len(unique)} unique candidates")
-    return recent
+    print(f"[fetcher] Total unique candidates: {len(unique)}")
+    return unique
