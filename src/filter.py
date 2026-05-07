@@ -9,28 +9,33 @@ import anthropic
 
 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-FILTER_SYSTEM = """You are a strict job listing evaluator for a mid-level engineer job search.
+FILTER_SYSTEM = """You are a job listing evaluator for a mid-level engineer job search targeting H1B visa holders.
 
-Criteria:
-- Target roles: Cloud Engineer, DevOps Engineer, AWS Engineer, Java Developer, Backend Engineer
-- Experience: 3–5 years ONLY. Reject roles requiring <2 or >5 years.
-- Employment: Full-time ONLY. Reject contract, C2C, freelance, part-time.
-- Location: Remote (US) or anywhere in the United States.
-- Sponsorship: ONLY include jobs that OFFER H1B sponsorship OR mention visa sponsorship.
-  EXCLUDE any job that says: no sponsorship, requires citizenship, requires green card, requires clearance.
-- Tech focus: preference for AWS, Kubernetes, Docker, Terraform, CI/CD, Java, Spring Boot.
+PASS a job if ALL of these are true:
+- Role matches: Cloud Engineer, DevOps Engineer, AWS Engineer, Java Developer, Backend Engineer, Platform Engineer, Infrastructure Engineer, or SRE
+- Experience: listing asks for 5 years or fewer (or does not specify). Reject only if it explicitly requires 6+ years.
+- Employment: Full-time. Reject contract, C2C, freelance, part-time.
+- Location: Remote, remote-US, or anywhere in the United States.
+- Sponsorship: DO NOT require the listing to mention sponsorship. Pass the job UNLESS it explicitly says any of: "no sponsorship", "will not sponsor", "cannot sponsor", "US citizen only", "requires green card", "requires clearance", "active clearance required".
+- Tech: at least some overlap with AWS, cloud, Kubernetes, Docker, Terraform, CI/CD, Java, Spring Boot, backend, or DevOps.
 
-For each job, respond with a JSON array. Each element:
+FAIL a job only if:
+- Wrong role type (frontend, mobile, data science, QA, sales, etc.)
+- Explicitly requires 6+ years of experience
+- Explicitly rejects visa sponsorship or requires citizenship/clearance
+- Contract or freelance only
+
+For each job respond with a JSON array. Each element:
 {
   "id": "<job id>",
   "pass": true or false,
   "reason": "one sentence why",
-  "sponsorship_note": "exact quote or phrase from listing about sponsorship, or 'Not mentioned'",
+  "sponsorship_note": "exact quote about sponsorship if mentioned, or 'Not mentioned — no explicit rejection'",
   "key_requirements": ["req1", "req2", "req3"],
-  "experience_required": "e.g. 3-5 years"
+  "experience_required": "e.g. 3-5 years or 'Not specified'"
 }
 
-Be strict. When in doubt, exclude. Only pass jobs with clear evidence of sponsorship or at minimum no explicit rejection of sponsorship AND a strong role match."""
+When in doubt, PASS the job. The user will do final vetting."""
 
 
 def filter_jobs(jobs: list[dict]) -> list[dict]:
