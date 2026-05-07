@@ -41,7 +41,7 @@ TECH_KEYWORDS = [
 ]
 
 
-RECENCY_HOURS = 13   # slightly over 12h to absorb cron timing drift
+RECENCY_HOURS = 72   # 3 days — dedup handles re-sends, this just blocks months-old listings
 
 
 def _parse_posted(value: str) -> datetime | None:
@@ -264,7 +264,7 @@ def fetch_jsearch() -> list[dict]:
                     "query":       query,
                     "page":        "1",
                     "num_pages":   "1",
-                    "date_posted": "today",
+                    "date_posted": "3days",
                 },
                 timeout=REQUEST_TIMEOUT,
             )
