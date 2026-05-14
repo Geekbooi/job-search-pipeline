@@ -229,6 +229,201 @@ def fetch_wwr() -> list[dict]:
     return jobs
 
 
+# ── Source: Indeed (RSS) ─────────────────────────────────────────────────────
+
+INDEED_QUERIES = [
+    "cloud+engineer",
+    "devops+engineer",
+    "aws+engineer",
+    "java+developer",
+    "backend+engineer",
+]
+
+def fetch_indeed() -> list[dict]:
+    jobs = []
+    for q in INDEED_QUERIES:
+        url = f"https://www.indeed.com/rss?q={q}&l=remote&sort=date&fromage=3&jt=fulltime"
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries:
+                raw = {
+                    "id":          entry.get("id", entry.get("link", "")),
+                    "title":       entry.get("title", ""),
+                    "company":     entry.get("source", {}).get("title", "") if isinstance(entry.get("source"), dict) else "",
+                    "location":    "Remote",
+                    "url":         entry.get("link", ""),
+                    "description": _strip_html(entry.get("summary", "")),
+                    "source":      "Indeed",
+                    "posted":      entry.get("published", ""),
+                }
+                job = _normalise(raw)
+                if job:
+                    jobs.append(job)
+            time.sleep(1)
+        except Exception as e:
+            print(f"[fetcher] Indeed q={q} error: {e}")
+    print(f"[fetcher] Indeed: {len(jobs)} candidates")
+    return jobs
+
+
+# ── Source: Dice ──────────────────────────────────────────────────────────────
+
+DICE_QUERIES = [
+    "cloud engineer",
+    "devops engineer",
+    "aws engineer",
+    "java developer",
+    "backend engineer",
+]
+
+def fetch_dice() -> list[dict]:
+    jobs = []
+    for q in DICE_QUERIES:
+        try:
+            resp = requests.get(
+                "https://job-search-api.svc.dice.com/v1/jobsearch",
+                params={
+                    "q":                              q,
+                    "countryCode2":                   "US",
+                    "filters.workFromHomeAvailability": "Remote",
+                    "filters.postedDate":             "THREE",
+                    "filters.employmentType":         "FULLTIME",
+                    "pageSize":                       50,
+                    "page":                           1,
+                },
+                headers={"Accept": "application/json", "User-Agent": "job-search-bot/1.0"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            for item in resp.json().get("data", []):
+                raw = {
+                    "id":          item.get("id", ""),
+                    "title":       item.get("title", ""),
+                    "company":     item.get("advertiserName", item.get("companyPageUri", "Unknown")),
+                    "location":    item.get("location", "Remote"),
+                    "url":         item.get("applyUrl") or f"https://www.dice.com/jobs/{item.get('id','')}",
+                    "description": _strip_html(item.get("summary", item.get("description", ""))),
+                    "source":      "Dice",
+                    "posted":      item.get("postedDate", item.get("modifiedDate", "")),
+                }
+                job = _normalise(raw)
+                if job:
+                    jobs.append(job)
+            time.sleep(1)
+        except Exception as e:
+            print(f"[fetcher] Dice q='{q}' error: {e}")
+    print(f"[fetcher] Dice: {len(jobs)} candidates")
+    return jobs
+
+
+# ── Source: Greenhouse ATS ────────────────────────────────────────────────────
+
+GREENHOUSE_COMPANIES = [
+    "stripe", "airbnb", "lyft", "dropbox", "twilio", "cloudflare",
+    "hashicorp", "datadoghq", "mongodb", "elastic", "okta", "pagerduty",
+    "zendesk", "confluent", "snowflake", "databricks", "figma", "asana",
+    "squarespace", "hubspot",
+]
+
+def fetch_greenhouse() -> list[dict]:
+    jobs = []
+    for token in GREENHOUSE_COMPANIES:
+        try:
+            resp = requests.get(
+                f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs",
+                params={"content": "true"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if resp.status_code == 404:
+                continue
+            resp.raise_for_status()
+            for item in resp.json().get("jobs", []):
+                location = ""
+                offices = item.get("offices") or item.get("location", {})
+                if isinstance(offices, list) and offices:
+                    location = offices[0].get("name", "Remote")
+                elif isinstance(offices, dict):
+                    location = offices.get("name", "Remote")
+                # only keep remote or USA roles
+                loc_lower = location.lower()
+                if location and "remote" not in loc_lower and "united states" not in loc_lower and "usa" not in loc_lower and ", ca" not in loc_lower and ", ny" not in loc_lower:
+                    continue
+                raw = {
+                    "id":          str(item.get("id", "")),
+                    "title":       item.get("title", ""),
+                    "company":     token.capitalize(),
+                    "location":    location or "Remote",
+                    "url":         item.get("absolute_url", ""),
+                    "description": _strip_html(item.get("content", "")),
+                    "source":      "Greenhouse",
+                    "posted":      item.get("updated_at", ""),
+                }
+                job = _normalise(raw)
+                if job:
+                    jobs.append(job)
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"[fetcher] Greenhouse token={token} error: {e}")
+    print(f"[fetcher] Greenhouse: {len(jobs)} candidates")
+    return jobs
+
+
+# ── Source: Lever ATS ─────────────────────────────────────────────────────────
+
+LEVER_COMPANIES = [
+    "netflix", "coinbase", "plaid", "brex", "gusto", "checkr",
+    "benchling", "scale-ai", "robinhood", "netlify", "retool",
+    "notion", "carta", "chime", "faire", "canva",
+]
+
+def fetch_lever() -> list[dict]:
+    jobs = []
+    for company in LEVER_COMPANIES:
+        try:
+            resp = requests.get(
+                f"https://api.lever.co/v0/postings/{company}",
+                params={"mode": "json", "commitment": "Full-time"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if resp.status_code == 404:
+                continue
+            resp.raise_for_status()
+            for item in resp.json():
+                location = item.get("categories", {}).get("location", "Remote") or "Remote"
+                loc_lower = location.lower()
+                if location and "remote" not in loc_lower and "united states" not in loc_lower and "usa" not in loc_lower:
+                    continue
+                lists_text = " ".join(
+                    " ".join(block.get("content", [])) if isinstance(block.get("content"), list) else ""
+                    for block in item.get("lists", [])
+                )
+                description = _strip_html(item.get("text", "") + " " + item.get("descriptionPlain", "") + " " + lists_text)
+                created_ms = item.get("createdAt")
+                posted_iso = (
+                    datetime.fromtimestamp(created_ms / 1000, tz=timezone.utc).isoformat()
+                    if isinstance(created_ms, (int, float)) and created_ms > 0
+                    else ""
+                )
+                raw = {
+                    "id":          item.get("id", ""),
+                    "title":       item.get("text", ""),
+                    "company":     company.capitalize(),
+                    "location":    location,
+                    "url":         item.get("hostedUrl", item.get("applyUrl", "")),
+                    "description": description,
+                    "source":      "Lever",
+                    "posted":      posted_iso,
+                }
+                job = _normalise(raw)
+                if job:
+                    jobs.append(job)
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"[fetcher] Lever company={company} error: {e}")
+    print(f"[fetcher] Lever: {len(jobs)} candidates")
+    return jobs
+
+
 # ── Source: JSearch via RapidAPI (optional) ───────────────────────────────────
 
 JSEARCH_QUERIES = [
@@ -295,6 +490,10 @@ def fetch_all() -> list[dict]:
     all_jobs += fetch_remoteok()
     all_jobs += fetch_jobicy()
     all_jobs += fetch_wwr()
+    all_jobs += fetch_indeed()
+    all_jobs += fetch_dice()
+    all_jobs += fetch_greenhouse()
+    all_jobs += fetch_lever()
     all_jobs += fetch_jsearch()
 
     # Deduplicate by URL within this batch
